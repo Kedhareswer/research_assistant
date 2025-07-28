@@ -5,10 +5,10 @@ A comprehensive AI-powered research assistant that transforms how you conduct ac
 ## ✨ Features
 
 ### 🔍 Intelligent Research
-- **Real-time Web Search**: Access the latest information from multiple sources
+- **Real-time Web Search**: Access the latest information from multiple sources including DuckDuckGo, Wikipedia, arXiv, and PubMed
 - **Academic Database Integration**: Connect to arXiv, PubMed, and open access repositories
-- **AI-Powered Summarization**: Get comprehensive summaries in your preferred tone
-- **Multi-source Analysis**: Cross-reference information for accuracy
+- **AI-Powered Summarization**: Get comprehensive summaries in your preferred tone using Groq and Google Gemini
+- **Multi-source Analysis**: Cross-reference information for accuracy with fallback search sources
 
 ### 📚 Citation Management
 - **Multiple Citation Styles**: APA, MLA, IEEE, Chicago, BibTeX
@@ -32,43 +32,48 @@ A comprehensive AI-powered research assistant that transforms how you conduct ac
 
 ### Prerequisites
 - Node.js 18+ 
-- npm or yarn
-- OpenAI API key (for AI features)
+- pnpm (recommended) or npm
+- API keys for AI services (Groq, Google Gemini)
 
 ### Installation
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-username/ai-research-assistant.git
+   git clone https://github.com/kedhareswer/ai-research-assistant.git
    cd ai-research-assistant
    ```
 
 2. **Install dependencies**
    ```bash
-   npm install
+   pnpm install
    # or
-   yarn install
+   npm install
    ```
 
 3. **Set up environment variables**
    ```bash
-   cp .env.example .env.local
+   cp env.example .env.local
    ```
    
    Add your API keys:
    ```env
+   # AI Model API Keys (Required)
    GROQ_API_KEY=your_groq_api_key_here
    GOOGLE_GENERATIVE_AI_API_KEY=your_gemini_api_key_here
+   
+   # Search API Keys (Optional - fallback sources will be used)
    LANGSEARCH_API_KEY=your_langsearch_api_key_here
    BRAVE_API_KEY=your_brave_search_api_key_here
+   
+   # Next.js Configuration
    NEXT_PUBLIC_APP_URL=http://localhost:3000
    ```
 
 4. **Run the development server**
    ```bash
-   npm run dev
+   pnpm dev
    # or
-   yarn dev
+   npm run dev
    ```
 
 5. **Open your browser**
@@ -103,22 +108,25 @@ A comprehensive AI-powered research assistant that transforms how you conduct ac
 ## 🛠️ Technology Stack
 
 ### Backend
-- **Next.js API Routes**: Serverless backend
+- **Next.js 15**: React framework with API routes
 - **Vercel AI SDK**: AI model integration
-- **Groq Llama-3.3**: Fast, efficient language model for summarization
-- **Google Gemini**: Advanced AI for citation formatting and analysis
-- **LangSearch API**: Hybrid web search with semantic reranking
-- **Brave Search API**: Privacy-focused web search
+- **Groq Llama-3.1-8b-instant**: Fast, efficient language model for summarization
+- **Google Gemini-1.5-Flash**: Advanced AI for citation formatting and analysis
+- **Fallback Search Services**: DuckDuckGo, Wikipedia, arXiv, PubMed
 - **Custom Citation Engine**: Multi-format citation generation
 
 ### AI Models & APIs
-- **Groq Llama-3.3-70B**: Primary research summarization
-- **Groq Llama-3.3-70B-SpeDec**: Fast insights extraction
-- **Google Gemini-1.5-Pro**: Citation formatting and analysis
-- **Google Gemini-1.5-Flash**: Related topics generation
-- **LangSearch Hybrid Search**: Combines keyword and vector search
-- **LangSearch Reranker**: Semantic result reranking
-- **Brave Search**: Privacy-focused web search
+- **Groq Llama-3.1-8b-instant**: Primary research summarization
+- **Google Gemini-1.5-Flash**: Citation formatting and analysis
+- **Fallback Search**: Multiple sources for comprehensive research
+- **Error Handling**: Graceful fallbacks when APIs are unavailable
+
+### Frontend
+- **React 19**: Modern UI framework
+- **TypeScript**: Type-safe development
+- **Tailwind CSS**: Utility-first styling
+- **shadcn/ui**: Beautiful, accessible components
+- **Next.js App Router**: Modern routing and layouts
 
 ### Deployment
 - **Vercel**: Optimized hosting platform
@@ -154,27 +162,15 @@ const writingTones = {
 
 ### Search Services Setup
 
-#### LangSearch API
-1. Sign up at [LangSearch](https://langsearch.com/api-keys)
-2. Get your free API key
-3. Add to `.env.local` as `LANGSEARCH_API_KEY`
+#### Required API Keys
+- **Groq API Key**: Required for AI summarization and analysis
+- **Google Gemini API Key**: Required for citation formatting and insights
 
-**Features:**
-- Hybrid search combining keywords and vectors
-- Semantic reranking for enhanced accuracy
-- Long-text summaries with markdown support
-- Free tier for individuals and small teams
+#### Optional API Keys
+- **LangSearch API**: Enhanced web search with semantic reranking
+- **Brave Search API**: Privacy-focused web search backup
 
-#### Brave Search API
-1. Sign up at [Brave Search API](https://api.search.brave.com/)
-2. Get your API key
-3. Add to `.env.local` as `BRAVE_API_KEY`
-
-**Features:**
-- Privacy-focused web search
-- No tracking or profiling
-- Fresh, independent search results
-- Backup search service
+**Fallback Sources**: The system automatically uses DuckDuckGo, Wikipedia, arXiv, and PubMed when premium APIs are unavailable.
 
 ## 📊 API Reference
 
@@ -241,7 +237,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- **OpenAI** for providing advanced language models
+- **Groq** for providing fast, efficient language models
+- **Google** for Gemini AI capabilities
 - **Vercel** for excellent hosting and AI SDK
 - **shadcn/ui** for beautiful UI components
 - **Academic Community** for open access research initiatives

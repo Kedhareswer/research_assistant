@@ -78,10 +78,35 @@ export class LangSearchClient {
       })
 
       if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`LangSearch Web Search API error: ${response.status} ${response.statusText}`)
+        console.error("Response body:", errorText)
         throw new Error(`LangSearch Web Search API error: ${response.status} ${response.statusText}`)
       }
 
-      return await response.json()
+      const data = await response.json()
+      
+      // Handle the actual API response structure
+      if (data.code && data.code !== 200) {
+        throw new Error(`LangSearch API error: ${data.msg || 'Unknown error'}`)
+      }
+
+      // Extract results from the response structure
+      const results = data.data?.webPages?.value || data.results || []
+      
+      return {
+        results: results.map((result: any) => ({
+          title: result.name || result.title || 'Untitled',
+          url: result.url || '',
+          content: result.content || result.snippet || '',
+          snippet: result.snippet || result.content?.substring(0, 200) || '',
+          published_date: result.datePublished || result.published_date,
+          domain: result.url ? new URL(result.url).hostname : '',
+          images: result.images || [],
+          videos: result.videos || [],
+        })),
+        summary: data.data?.summary || data.summary,
+      }
     } catch (error) {
       console.error("LangSearch web search error:", error)
       throw error
@@ -108,10 +133,20 @@ export class LangSearchClient {
       })
 
       if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`LangSearch Rerank API error: ${response.status} ${response.statusText}`)
+        console.error("Response body:", errorText)
         throw new Error(`LangSearch Rerank API error: ${response.status} ${response.statusText}`)
       }
 
-      return await response.json()
+      const data = await response.json()
+      
+      // Handle the actual API response structure
+      if (data.code && data.code !== 200) {
+        throw new Error(`LangSearch Rerank API error: ${data.msg || 'Unknown error'}`)
+      }
+
+      return data
     } catch (error) {
       console.error("LangSearch rerank error:", error)
       throw error

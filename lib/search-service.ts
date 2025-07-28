@@ -50,9 +50,12 @@ export class SearchService {
       try {
         const langSearchResults = await this.searchWithLangSearch(query, numResults, freshness, summary)
         results.push(...langSearchResults)
+        console.log(`✅ LangSearch returned ${langSearchResults.length} results`)
       } catch (error) {
-        console.warn("LangSearch failed:", error)
+        console.warn("LangSearch failed:", error instanceof Error ? error.message : String(error))
       }
+    } else {
+      console.warn("LangSearch API key not configured")
     }
 
     // Try Brave Search as backup if we don't have enough results
@@ -60,9 +63,12 @@ export class SearchService {
       try {
         const braveResults = await this.searchWithBrave(query, numResults - results.length)
         results.push(...braveResults)
+        console.log(`✅ Brave Search returned ${braveResults.length} results`)
       } catch (error) {
-        console.warn("Brave search failed:", error)
+        console.warn("Brave search failed:", error instanceof Error ? error.message : String(error))
       }
+    } else if (!this.braveApiKey) {
+      console.warn("Brave API key not configured")
     }
 
     // Return results or real search results with enhancement
@@ -79,6 +85,7 @@ export class SearchService {
 
   async rerankResults(query: string, results: SearchResult[], topN = 10): Promise<SearchResult[]> {
     if (!this.langSearchApiKey || !results || results.length === 0) {
+      console.log("Skipping rerank - no API key or no results")
       return results.slice(0, topN)
     }
 
@@ -109,11 +116,19 @@ export class SearchService {
       })
 
       if (!response.ok) {
-        console.warn(`LangSearch Rerank API error: ${response.status}`)
+        const errorText = await response.text()
+        console.warn(`LangSearch Rerank API error: ${response.status} ${response.statusText}`)
+        console.warn("Response body:", errorText)
         return results.slice(0, topN)
       }
 
       const data = await response.json()
+
+      // Handle the actual API response structure
+      if (data.code && data.code !== 200) {
+        console.warn(`LangSearch Rerank API error: ${data.msg || 'Unknown error'}`)
+        return results.slice(0, topN)
+      }
 
       // Add null checks for the response data
       if (!data || !data.results || !Array.isArray(data.results)) {
@@ -131,7 +146,7 @@ export class SearchService {
         }
       })
     } catch (error) {
-      console.error("Reranking failed:", error)
+      console.error("Reranking failed:", error instanceof Error ? error.message : String(error))
       return results.slice(0, topN)
     }
   }
@@ -142,69 +157,97 @@ export class SearchService {
     freshness: string,
     summary: boolean,
   ): Promise<SearchResult[]> {
-    const response = await fetch("https://api.langsearch.com/v1/web-search", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.langSearchApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        query,
-        freshness,
-        summary,
-        count,
-      }),
-    })
+    try {
+      const response = await fetch("https://api.langsearch.com/v1/web-search", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.langSearchApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query,
+          count,
+          freshness,
+          summary,
+        }),
+      })
 
-    if (!response.ok) {
-      throw new Error(`LangSearch API error: ${response.status}`)
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`LangSearch API error: ${response.status} ${response.statusText}`)
+        console.error("Response body:", errorText)
+        // Don't throw error, just return empty results
+        return []
+      }
+
+      const data = await response.json()
+
+      // Handle the actual API response structure
+      if (data.code && data.code !== 200) {
+        console.error(`LangSearch API error: ${data.msg || 'Unknown error'}`)
+        // Don't throw error, just return empty results
+        return []
+      }
+
+      // Extract results from the response structure
+      const results = data.data?.webPages?.value || data.results || []
+
+      return results.map((result: any, index: number) => ({
+        title: result.name || result.title || 'Untitled',
+        url: result.url || '',
+        snippet: result.snippet || result.content?.substring(0, 200) + "..." || "",
+        domain: result.url ? new URL(result.url).hostname : '',
+        score: 1 - index * 0.05, // Higher base score for LangSearch results
+        published_date: result.datePublished || result.published_date || new Date().toISOString(),
+        author: "Unknown",
+      }))
+    } catch (error) {
+      console.error("LangSearch search failed:", error instanceof Error ? error.message : String(error))
+      // Don't throw error, just return empty results
+      return []
     }
-
-    const data = await response.json()
-
-    return (data.results || []).map((result: LangSearchResult, index: number) => ({
-      title: result.title,
-      url: result.url,
-      snippet: result.snippet || result.content?.substring(0, 200) + "..." || "",
-      domain: result.domain || new URL(result.url).hostname,
-      score: 1 - index * 0.05, // Higher base score for LangSearch results
-      published_date: result.published_date || new Date().toISOString(),
-      author: "Unknown",
-    }))
   }
 
   private async searchWithBrave(query: string, count: number): Promise<SearchResult[]> {
-    const url = new URL("https://api.search.brave.com/res/v1/web/search")
-    url.searchParams.append("q", query)
-    url.searchParams.append("count", count.toString())
-    url.searchParams.append("country", "US")
-    url.searchParams.append("search_lang", "en")
-    url.searchParams.append("ui_lang", "en-US")
+    try {
+      const url = new URL("https://api.search.brave.com/res/v1/web/search")
+      url.searchParams.append("q", query)
+      url.searchParams.append("count", count.toString())
+      url.searchParams.append("country", "US")
+      url.searchParams.append("search_lang", "en")
+      url.searchParams.append("ui_lang", "en-US")
 
-    const response = await fetch(url.toString(), {
-      method: "GET",
-      headers: {
-        "X-Subscription-Token": this.braveApiKey!,
-        "Accept": "application/json",
-        "Accept-Encoding": "gzip",
-      },
-    })
+      const response = await fetch(url.toString(), {
+        method: "GET",
+        headers: {
+          "X-Subscription-Token": this.braveApiKey!,
+          "Accept": "application/json",
+          "Accept-Encoding": "gzip",
+        },
+      })
 
-    if (!response.ok) {
-      throw new Error(`Brave API error: ${response.status}`)
+      if (!response.ok) {
+        console.error(`Brave API error: ${response.status} ${response.statusText}`)
+        // Don't throw error, just return empty results
+        return []
+      }
+
+      const data = await response.json()
+
+      return (data.web?.results || []).map((result: any, index: number) => ({
+        title: result.title,
+        url: result.url,
+        snippet: result.description || "",
+        domain: new URL(result.url).hostname,
+        score: 0.8 - index * 0.05, // Slightly lower base score for Brave results
+        published_date: result.age || new Date().toISOString(),
+        author: "Unknown",
+      }))
+    } catch (error) {
+      console.error("Brave search failed:", error instanceof Error ? error.message : String(error))
+      // Don't throw error, just return empty results
+      return []
     }
-
-    const data = await response.json()
-
-    return (data.web?.results || []).map((result: any, index: number) => ({
-      title: result.title,
-      url: result.url,
-      snippet: result.description || "",
-      domain: new URL(result.url).hostname,
-      score: 0.8 - index * 0.05, // Slightly lower base score for Brave results
-      published_date: result.age || new Date().toISOString(),
-      author: "Unknown",
-    }))
   }
 
   private async getRealSearchResults(query: string): Promise<SearchResult[]> {
@@ -316,29 +359,50 @@ export class SearchService {
       if (!response.ok) return []
       
       const text = await response.text()
-      const parser = new DOMParser()
-      const xmlDoc = parser.parseFromString(text, 'text/xml')
       
-      const entries = xmlDoc.querySelectorAll('entry')
+      // Use a simple regex-based parser instead of DOMParser
       const results: SearchResult[] = []
       
-      entries.forEach((entry, index) => {
-        const title = entry.querySelector('title')?.textContent || query
-        const summary = entry.querySelector('summary')?.textContent || ''
-        const id = entry.querySelector('id')?.textContent || ''
-        const published = entry.querySelector('published')?.textContent || new Date().toISOString()
-        const authors = Array.from(entry.querySelectorAll('author name')).map(author => author.textContent).join(', ')
+      // Extract entries using regex
+      const entryRegex = /<entry>([\s\S]*?)<\/entry>/g
+      let match
+      let index = 0
+      
+      while ((match = entryRegex.exec(text)) && index < 3) {
+        const entry = match[1]
+        
+        // Extract title
+        const titleMatch = entry.match(/<title>([^<]+)<\/title>/)
+        const title = titleMatch ? titleMatch[1].replace(/\s+/g, ' ').trim() : query
+        
+        // Extract summary
+        const summaryMatch = entry.match(/<summary>([^<]+)<\/summary>/)
+        const summary = summaryMatch ? summaryMatch[1].replace(/\s+/g, ' ').trim() : ''
+        
+        // Extract id
+        const idMatch = entry.match(/<id>([^<]+)<\/id>/)
+        const id = idMatch ? idMatch[1] : ''
+        
+        // Extract published date
+        const publishedMatch = entry.match(/<published>([^<]+)<\/published>/)
+        const published = publishedMatch ? publishedMatch[1] : new Date().toISOString()
+        
+        // Extract authors
+        const authorMatches = entry.match(/<name>([^<]+)<\/name>/g)
+        const authors = authorMatches ? authorMatches.map(a => a.replace(/<\/?name>/g, '')).join(', ') : 'arXiv Authors'
         
         results.push({
-          title: title.replace(/\s+/g, ' ').trim(),
+          title: title,
           url: id,
-          snippet: summary.replace(/\s+/g, ' ').trim(),
+          snippet: summary,
           domain: 'arxiv.org',
           score: 0.9 - index * 0.1,
           published_date: published,
-          author: authors || 'arXiv Authors'
+          author: authors
         })
-      })
+        
+        index++
+      }
       
       return results
     } catch (error) {
