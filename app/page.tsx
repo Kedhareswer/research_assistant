@@ -16,6 +16,7 @@ interface APIStatus {
   langSearch: boolean
   brave: boolean
   googleSearch: boolean
+  openAlex: boolean
 }
 
 export default function ResearchAssistant() {
@@ -37,6 +38,7 @@ export default function ResearchAssistant() {
     langSearch: false,
     brave: false,
     googleSearch: false,
+    openAlex: false,
   })
 
   // Check API status on component mount
@@ -109,7 +111,7 @@ export default function ResearchAssistant() {
   }
 
   const hasAnyAI = apiStatus.groq || apiStatus.gemini
-  const hasAnySearch = apiStatus.langSearch || apiStatus.brave || apiStatus.googleSearch
+  const hasAnySearch = apiStatus.langSearch || apiStatus.brave || apiStatus.googleSearch || apiStatus.openAlex
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
@@ -150,6 +152,10 @@ export default function ResearchAssistant() {
               <div className="flex items-center gap-2">
                 {getStatusIcon(apiStatus.googleSearch)}
                 <span className="text-sm">Google Search</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {getStatusIcon(apiStatus.openAlex)}
+                <span className="text-sm">OpenAlex</span>
               </div>
             </div>
 
@@ -228,6 +234,7 @@ export default function ResearchAssistant() {
               {apiStatus.langSearch && <Badge variant="default">LangSearch Hybrid Search</Badge>}
               {apiStatus.brave && <Badge variant="secondary">Brave Search</Badge>}
               {apiStatus.googleSearch && <Badge variant="secondary">Google Search</Badge>}
+              {apiStatus.openAlex && <Badge variant="secondary">OpenAlex Scholarly</Badge>}
               {apiStatus.groq && <Badge variant="default">Groq Llama-3.3</Badge>}
               {apiStatus.gemini && <Badge variant="secondary">Google Gemini</Badge>}
               {apiStatus.langSearch && <Badge variant="outline">Semantic Reranking</Badge>}

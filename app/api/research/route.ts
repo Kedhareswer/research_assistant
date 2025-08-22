@@ -29,12 +29,14 @@ class APIChecker {
     langSearch: boolean
     brave: boolean
     googleSearch: boolean
+    openAlex: boolean
   } = {
     groq: false,
     gemini: false,
     langSearch: false,
     brave: false,
     googleSearch: false,
+    openAlex: false,
   }
 
   constructor() {
@@ -54,6 +56,7 @@ class APIChecker {
     this.availableAPIs.langSearch = !!process.env.LANGSEARCH_API_KEY
     this.availableAPIs.brave = !!process.env.BRAVE_API_KEY
     this.availableAPIs.googleSearch = !!process.env.GOOGLE_SEARCH_API_KEY && !!process.env.GOOGLE_SEARCH_CSE_ID
+    this.availableAPIs.openAlex = !!process.env.OPENALEX_MAILTO || !!process.env.OPENALEX_API_KEY
 
     console.log("Available APIs:", this.availableAPIs)
   }
@@ -68,10 +71,11 @@ class APIChecker {
     return null
   }
 
-  getAvailableSearch(): "langSearch" | "brave" | "googleSearch" | null {
+  getAvailableSearch(): "langSearch" | "brave" | "googleSearch" | "openAlex" | null {
     if (this.availableAPIs.langSearch) return "langSearch"
     if (this.availableAPIs.brave) return "brave"
     if (this.availableAPIs.googleSearch) return "googleSearch"
+    if (this.availableAPIs.openAlex) return "openAlex"
     return null
   }
 }
