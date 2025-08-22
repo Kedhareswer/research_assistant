@@ -15,6 +15,7 @@ interface APIStatus {
   gemini: boolean
   langSearch: boolean
   brave: boolean
+  googleSearch: boolean
 }
 
 export default function ResearchAssistant() {
@@ -35,6 +36,7 @@ export default function ResearchAssistant() {
     gemini: false,
     langSearch: false,
     brave: false,
+    googleSearch: false,
   })
 
   // Check API status on component mount
@@ -107,7 +109,7 @@ export default function ResearchAssistant() {
   }
 
   const hasAnyAI = apiStatus.groq || apiStatus.gemini
-  const hasAnySearch = apiStatus.langSearch || apiStatus.brave
+  const hasAnySearch = apiStatus.langSearch || apiStatus.brave || apiStatus.googleSearch
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
@@ -128,7 +130,7 @@ export default function ResearchAssistant() {
             <CardDescription>Current status of integrated services</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <div className="flex items-center gap-2">
                 {getStatusIcon(apiStatus.groq)}
                 <span className="text-sm">Groq AI</span>
@@ -145,6 +147,10 @@ export default function ResearchAssistant() {
                 {getStatusIcon(apiStatus.brave)}
                 <span className="text-sm">Brave Search</span>
               </div>
+              <div className="flex items-center gap-2">
+                {getStatusIcon(apiStatus.googleSearch)}
+                <span className="text-sm">Google Search</span>
+              </div>
             </div>
 
             {!hasAnyAI && (
@@ -158,8 +164,8 @@ export default function ResearchAssistant() {
             {!hasAnySearch && (
               <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                 <p className="text-sm text-yellow-700">
-                  ⚠️ No search APIs available. Using fallback sources. Configure LANGSEARCH_API_KEY or BRAVE_API_KEY for
-                  better results.
+                  ⚠️ No search APIs available. Using fallback sources. Configure LANGSEARCH_API_KEY, BRAVE_API_KEY, or
+                  GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_CSE_ID for better results.
                 </p>
               </div>
             )}
@@ -221,6 +227,7 @@ export default function ResearchAssistant() {
             <div className="flex flex-wrap gap-2">
               {apiStatus.langSearch && <Badge variant="default">LangSearch Hybrid Search</Badge>}
               {apiStatus.brave && <Badge variant="secondary">Brave Search</Badge>}
+              {apiStatus.googleSearch && <Badge variant="secondary">Google Search</Badge>}
               {apiStatus.groq && <Badge variant="default">Groq Llama-3.3</Badge>}
               {apiStatus.gemini && <Badge variant="secondary">Google Gemini</Badge>}
               {apiStatus.langSearch && <Badge variant="outline">Semantic Reranking</Badge>}

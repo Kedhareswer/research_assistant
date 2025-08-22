@@ -35,10 +35,14 @@ interface RerankDocument {
 export class SearchService {
   private braveApiKey?: string
   private langSearchApiKey?: string
+  private googleApiKey?: string
+  private googleCseId?: string
 
   constructor() {
     this.braveApiKey = process.env.BRAVE_API_KEY
     this.langSearchApiKey = process.env.LANGSEARCH_API_KEY
+    this.googleApiKey = process.env.GOOGLE_SEARCH_API_KEY
+    this.googleCseId = process.env.GOOGLE_SEARCH_CSE_ID
   }
 
   async search(options: SearchOptions): Promise<SearchResult[]> {
@@ -69,6 +73,19 @@ export class SearchService {
       }
     } else if (!this.braveApiKey) {
       console.warn("Brave API key not configured")
+    }
+
+    // Try Google Custom Search if we still need more results
+    if (this.googleApiKey && this.googleCseId && results.length < numResults) {
+      try {
+        const googleResults = await this.searchWithGoogle(query, numResults - results.length)
+        results.push(...googleResults)
+        console.log(`✅ Google Search returned ${googleResults.length} results`)
+      } catch (error) {
+        console.warn("Google search failed:", error instanceof Error ? error.message : String(error))
+      }
+    } else if (!this.googleApiKey || !this.googleCseId) {
+      console.warn("Google Custom Search not configured (missing GOOGLE_SEARCH_API_KEY or GOOGLE_SEARCH_CSE_ID)")
     }
 
     // Return results or real search results with enhancement
@@ -148,6 +165,43 @@ export class SearchService {
     } catch (error) {
       console.error("Reranking failed:", error instanceof Error ? error.message : String(error))
       return results.slice(0, topN)
+    }
+  }
+
+  private async searchWithGoogle(query: string, count: number): Promise<SearchResult[]> {
+    try {
+      const url = new URL("https://www.googleapis.com/customsearch/v1")
+      url.searchParams.append("key", this.googleApiKey!)
+      url.searchParams.append("cx", this.googleCseId!)
+      url.searchParams.append("q", query)
+      url.searchParams.append("num", Math.min(10, Math.max(1, count)).toString())
+      url.searchParams.append("safe", "off")
+
+      const response = await fetch(url.toString(), {
+        method: "GET",
+        headers: { "Accept": "application/json" },
+      })
+
+      if (!response.ok) {
+        console.error(`Google CSE API error: ${response.status} ${response.statusText}`)
+        return []
+      }
+
+      const data = await response.json()
+      const items = Array.isArray(data.items) ? data.items : []
+
+      return items.map((item: any, index: number) => ({
+        title: item.title || "Untitled",
+        url: item.link || "",
+        snippet: item.snippet || (item.htmlSnippet ? String(item.htmlSnippet).replace(/<[^>]*>/g, " ") : ""),
+        domain: item.displayLink || (item.link ? new URL(item.link).hostname : ""),
+        score: 0.78 - index * 0.04,
+        published_date: new Date().toISOString(),
+        author: "Unknown",
+      }))
+    } catch (error) {
+      console.error("Google search failed:", error instanceof Error ? error.message : String(error))
+      return []
     }
   }
 

@@ -6,6 +6,7 @@ export async function GET() {
     gemini: !!process.env.GOOGLE_GENERATIVE_AI_API_KEY,
     langSearch: !!process.env.LANGSEARCH_API_KEY,
     brave: !!process.env.BRAVE_API_KEY,
+    googleSearch: !!process.env.GOOGLE_SEARCH_API_KEY && !!process.env.GOOGLE_SEARCH_CSE_ID,
   }
 
   return NextResponse.json(status)

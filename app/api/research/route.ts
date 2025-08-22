@@ -28,11 +28,13 @@ class APIChecker {
     gemini: boolean
     langSearch: boolean
     brave: boolean
+    googleSearch: boolean
   } = {
     groq: false,
     gemini: false,
     langSearch: false,
     brave: false,
+    googleSearch: false,
   }
 
   constructor() {
@@ -51,6 +53,7 @@ class APIChecker {
     this.availableAPIs.gemini = !!process.env.GOOGLE_GENERATIVE_AI_API_KEY
     this.availableAPIs.langSearch = !!process.env.LANGSEARCH_API_KEY
     this.availableAPIs.brave = !!process.env.BRAVE_API_KEY
+    this.availableAPIs.googleSearch = !!process.env.GOOGLE_SEARCH_API_KEY && !!process.env.GOOGLE_SEARCH_CSE_ID
 
     console.log("Available APIs:", this.availableAPIs)
   }
@@ -65,9 +68,10 @@ class APIChecker {
     return null
   }
 
-  getAvailableSearch(): "langSearch" | "brave" | null {
+  getAvailableSearch(): "langSearch" | "brave" | "googleSearch" | null {
     if (this.availableAPIs.langSearch) return "langSearch"
     if (this.availableAPIs.brave) return "brave"
+    if (this.availableAPIs.googleSearch) return "googleSearch"
     return null
   }
 }
