@@ -1,3 +1,9 @@
+import { openalexWorksSearch, openalexAboutness } from '@/lib/providers/openalex'
+import { crossrefWorksSearch } from '@/lib/providers/crossref'
+import { arxivSearch } from '@/lib/providers/arxiv'
+import { europePmcSearch } from '@/lib/providers/europepmc'
+import type { PagedPapers } from '@/lib/types'
+
 interface SearchResult {
   title: string
   url: string
@@ -37,16 +43,12 @@ export class SearchService {
   private langSearchApiKey?: string
   private googleApiKey?: string
   private googleCseId?: string
-  private openAlexMailto?: string
-  private openAlexApiKey?: string
 
   constructor() {
     this.braveApiKey = process.env.BRAVE_API_KEY
     this.langSearchApiKey = process.env.LANGSEARCH_API_KEY
     this.googleApiKey = process.env.GOOGLE_SEARCH_API_KEY
     this.googleCseId = process.env.GOOGLE_SEARCH_CSE_ID
-    this.openAlexMailto = process.env.OPENALEX_MAILTO
-    this.openAlexApiKey = process.env.OPENALEX_API_KEY
   }
 
   async search(options: SearchOptions): Promise<SearchResult[]> {
@@ -90,17 +92,6 @@ export class SearchService {
       }
     } else if (!this.googleApiKey || !this.googleCseId) {
       console.warn("Google Custom Search not configured (missing GOOGLE_SEARCH_API_KEY or GOOGLE_SEARCH_CSE_ID)")
-    }
-
-    // Include OpenAlex scholarly results to enrich academic coverage
-    if (results.length < numResults) {
-      try {
-        const openAlexResults = await this.searchWithOpenAlex(query, numResults - results.length, freshness)
-        results.push(...openAlexResults)
-        console.log(`✅ OpenAlex returned ${openAlexResults.length} results`)
-      } catch (error) {
-        console.warn("OpenAlex search failed:", error instanceof Error ? error.message : String(error))
-      }
     }
 
     // Return results or real search results with enhancement
@@ -180,116 +171,6 @@ export class SearchService {
     } catch (error) {
       console.error("Reranking failed:", error instanceof Error ? error.message : String(error))
       return results.slice(0, topN)
-    }
-  }
-
-  private async searchWithOpenAlex(
-    query: string,
-    count: number,
-    freshness?: "day" | "week" | "month" | "year" | "noLimit",
-  ): Promise<SearchResult[]> {
-    try {
-      const baseUrl = new URL("https://api.openalex.org/works")
-      // Basic search
-      baseUrl.searchParams.set("search", query)
-      baseUrl.searchParams.set("per_page", Math.min(Math.max(1, count), 25).toString())
-      baseUrl.searchParams.set("page", "1")
-      baseUrl.searchParams.set("sort", "relevance_score:desc")
-
-      // Freshness filter mapping
-      if (freshness && freshness !== "noLimit") {
-        const now = new Date()
-        let fromDate: Date | null = null
-        switch (freshness) {
-          case "day":
-            fromDate = new Date(now.getTime() - 24 * 60 * 60 * 1000)
-            break
-          case "week":
-            fromDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-            break
-          case "month":
-            fromDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-            break
-          case "year":
-            fromDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
-            break
-        }
-        if (fromDate) {
-          const iso = fromDate.toISOString().split("T")[0]
-          baseUrl.searchParams.set("filter", `from_publication_date:${iso}`)
-        }
-      }
-
-      // Polite pool
-      if (this.openAlexMailto) baseUrl.searchParams.set("mailto", this.openAlexMailto)
-      if (this.openAlexApiKey) baseUrl.searchParams.set("api_key", this.openAlexApiKey)
-
-      const headers: Record<string, string> = { "Accept": "application/json" }
-      if (this.openAlexMailto) {
-        headers["User-Agent"] = `ResearchAssistant (+mailto:${this.openAlexMailto})`
-      }
-
-      const response = await fetch(baseUrl.toString(), { headers })
-      if (!response.ok) {
-        console.error(`OpenAlex API error: ${response.status} ${response.statusText}`)
-        return []
-      }
-
-      const data = await response.json()
-      const results = Array.isArray(data.results) ? data.results : []
-
-      const reconstructAbstract = (invIdx: Record<string, number[]>) => {
-        try {
-          const positions: Array<{ pos: number; word: string }> = []
-          for (const [word, idxs] of Object.entries(invIdx || {})) {
-            for (const pos of idxs) positions.push({ pos, word })
-          }
-          positions.sort((a, b) => a.pos - b.pos)
-          const text = positions.map(p => p.word).join(" ")
-          return text
-        } catch {
-          return ""
-        }
-      }
-
-      return results.map((work: any, index: number) => {
-        // Prefer an external landing page URL for user convenience
-        let url = work?.primary_location?.landing_page_url
-          || work?.best_oa_location?.landing_page_url
-          || (work?.doi ? (work.doi.startsWith("http") ? work.doi : `https://doi.org/${work.doi}`) : "")
-          || work?.id
-
-        // Fallback to OpenAlex ID if no external URL
-        if (!url) url = work?.id || ""
-
-        const domain = (() => {
-          try { return url ? new URL(url).hostname : "openalex.org" } catch { return "openalex.org" }
-        })()
-
-        const authors = Array.isArray(work?.authorships)
-          ? work.authorships.map((a: any) => a?.author?.display_name).filter(Boolean).slice(0, 5).join(", ")
-          : "Unknown"
-
-        const abstractText = work?.abstract_inverted_index
-          ? reconstructAbstract(work.abstract_inverted_index)
-          : ""
-
-        const publicationDate: string = work?.publication_date
-          || (work?.publication_year ? `${work.publication_year}-01-01` : new Date().toISOString())
-
-        return {
-          title: work?.display_name || "Untitled",
-          url,
-          snippet: abstractText ? (abstractText.length > 220 ? abstractText.slice(0, 220) + "..." : abstractText) : `${authors || "Unknown"} — ${work?.host_venue?.display_name || domain}`,
-          domain,
-          score: 0.86 - index * 0.03,
-          published_date: publicationDate,
-          author: authors || "Unknown",
-        } as SearchResult
-      })
-    } catch (error) {
-      console.error("OpenAlex search failed:", error instanceof Error ? error.message : String(error))
-      return []
     }
   }
 
@@ -438,8 +319,7 @@ export class SearchService {
         this.searchWithDuckDuckGo(query),
         this.searchWithWikipedia(query),
         this.searchWithArXiv(query),
-        this.searchWithPubMed(query),
-        this.searchWithOpenAlex(query, 5)
+        this.searchWithPubMed(query)
       ]
       
       const allResults = await Promise.allSettled(promises)
@@ -737,6 +617,30 @@ export class SearchService {
     )
     
     return enhancedResults
+  }
+
+  // OpenAlex provider wrappers
+  async openAlexWorksSearch(query: string, options?: { cursor?: string; perPage?: number; filter?: string }): Promise<PagedPapers> {
+    return openalexWorksSearch({ query, cursor: options?.cursor, perPage: options?.perPage, filter: options?.filter })
+  }
+
+  async openAlexAboutness(input: { title?: string; abstract?: string; fulltext?: string }): Promise<any> {
+    return openalexAboutness(input)
+  }
+
+  // Crossref provider wrappers
+  async crossrefWorks(query: string, options?: { cursor?: string; rows?: number; filter?: string }): Promise<PagedPapers> {
+    return crossrefWorksSearch({ query, cursor: options?.cursor, rows: options?.rows, filter: options?.filter })
+  }
+
+  // arXiv provider wrappers
+  async arxivWorks(query: string, options?: { start?: number; maxResults?: number; sortBy?: 'relevance'|'lastUpdatedDate'|'submittedDate'; sortOrder?: 'ascending'|'descending' }): Promise<PagedPapers> {
+    return arxivSearch({ query, start: options?.start, maxResults: options?.maxResults, sortBy: options?.sortBy, sortOrder: options?.sortOrder })
+  }
+
+  // Europe PMC provider wrappers
+  async europePmcWorks(query: string, options?: { cursor?: string; pageSize?: number; resultType?: 'lite'|'core' }): Promise<PagedPapers> {
+    return europePmcSearch({ query, cursor: options?.cursor, pageSize: options?.pageSize, resultType: options?.resultType })
   }
 }
 

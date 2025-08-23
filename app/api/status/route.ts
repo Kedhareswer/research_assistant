@@ -7,7 +7,10 @@ export async function GET() {
     langSearch: !!process.env.LANGSEARCH_API_KEY,
     brave: !!process.env.BRAVE_API_KEY,
     googleSearch: !!process.env.GOOGLE_SEARCH_API_KEY && !!process.env.GOOGLE_SEARCH_CSE_ID,
-    openAlex: !!process.env.OPENALEX_MAILTO || !!process.env.OPENALEX_API_KEY,
+    openalex: !!process.env.OPENALEX_MAILTO,
+    crossref: !!process.env.CROSSREF_MAILTO,
+    arxiv: true, // public API, no key required
+    europepmc: true, // public API, no key required
   }
 
   return NextResponse.json(status)
